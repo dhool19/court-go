@@ -21,6 +21,13 @@ async def create_court(
     return court
 
 
+@router.get("", response_model=list[CourtResponse])
+async def list_courts(db: AsyncSession = Depends(get_db)):
+    query = select(Court).order_by(Court.id)
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
 @router.get("/{court_id}", response_model=CourtResponse)
 async def read_court(
     court_id: int,
@@ -47,7 +54,7 @@ async def delete_court(
     return {"message": "court deleted"}
 
 
-@router.put("/{court_id}", response_model=CourtResponse)
+@router.patch("/{court_id}", response_model=CourtResponse)
 async def update_court(
     court_id: int, court_u: CourtUpdate, db: AsyncSession = Depends(get_db)
 ):
@@ -55,8 +62,11 @@ async def update_court(
     db_item = result.scalar_one_or_none()
     if db_item is None:
         raise HTTPException(status_code=404, detail="Court not found")
-    for key, value in court_u.model_dump(exclude_unset=True).items():
+    update_data = court_u.model_dump(exclude_unset=True)
+
+    for key, value in update_data.items():
         setattr(db_item, key, value)
+
     await db.commit()
     await db.refresh(db_item)
     return db_item
