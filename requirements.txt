@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+pydantic
+
+sqlalchemy
+sqlalchemy[asyncio]
+pymysql
+python-dotenv
+pathlib
+aiomysql
