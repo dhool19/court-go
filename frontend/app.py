@@ -15,7 +15,7 @@ def add_court_dialog():
         name = st.text_input("Court Name", max_chars=100)
         sport_type = st.selectbox("Sport", ["badminton", "tennis", "football"])
         hourly_price = st.number_input(
-            "Hourly Price (€)", min_value=0, max_value=20, step=5, format="%.2f"
+            "Hourly Price (€)", min_value=0.01, value=20, step=5, format="%.2f"
         )
         description = st.text_input("Description (Optional)", max_chars=500)
         submitted = st.form_submit_button("Save Court")
@@ -65,7 +65,6 @@ def edit_court_dialog(court):
         hourly_price = st.number_input(
             "Hourly Price (€)",
             min_value=0.0,
-            max_value=20.0,
             step=5.0,
             format="%.2f",
             value=float(court["hourly_price"]),
@@ -87,7 +86,7 @@ def edit_court_dialog(court):
                     "name": name.strip(),
                     "sport_type": sport_type,
                     "hourly_price": f"{hourly_price:.2f}",
-                    "description": description.strip(),
+                    "description": description.strip() or None,
                 }
 
                 try:
@@ -110,14 +109,15 @@ def edit_court_dialog(court):
 # ==========================================
 @st.dialog("Delete Court")
 def delete_court_dialog(court):
-    try:
-        res = requests.delete(f"{API_URL}/courts/{court['id']}", timeout=5)
-        res.raise_for_status()
-        st.success(f"Deleted {court['name']}!")
-        st.rerun()
-    except requests.RequestException as e:
-        st.error(f"Failed to delete: {e}")
-    return
+    st.write(f"Delete {court['name']}?")
+    if st.button("Confirm delete", type="primary"):
+        try:
+            response = requests.delete(f"{API_URL}/courts/{court['id']}", timeout=5)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            st.error(f"Failed to delete: {e}")
+        else:
+            st.rerun()
 
 
 # ==========================================
