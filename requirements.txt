@@ -9,3 +9,5 @@ python-dotenv
 pathlib
 aiomysql
 streamlit
+pwdlib[argon2]
+email-validator

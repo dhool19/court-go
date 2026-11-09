@@ -4,7 +4,9 @@ from sqlalchemy import text
 from fastapi.middleware.cors import CORSMiddleware
 
 from db.database import Base, engine
+from models.user_model import User
 from api.courts import router as courts_router
+from api.auth import router as users_router
 
 
 @asynccontextmanager
@@ -22,7 +24,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_origins=["*"],
 )
+
 app.include_router(courts_router)
+app.include_router(users_router)
 
 
 @app.get("/health")
