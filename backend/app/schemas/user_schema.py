@@ -16,3 +16,8 @@ class UserResponse(BaseModel):
     last_name: str
     email: EmailStr
     role: str
+
+
+class UserLogin(BaseModel):
+    email: EmailStr = Field(max_length=254)
+    password: str = Field(min_length=8, max_length=128)
