@@ -5,9 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from models.user_model import User
-from schemas.user_schema import UserCreate, UserResponse, UserLogin
+from schemas.user_schema import UserCreate, UserResponse, UserLogin, TokenResponse
 from db.database import get_db
-from core.security import hash_password, verify_password
+from core.security import hash_password, verify_password, create_access_token
+from api.dependencies import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -49,7 +50,7 @@ async def register_url(
     return user
 
 
-@router.post("/login", response_model=UserResponse)
+@router.post("/login", response_model=TokenResponse)
 async def login_user(
     data: UserLogin,
     db: AsyncSession = Depends(get_db),
@@ -76,4 +77,13 @@ async def login_user(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is not active")
 
-    return user
+    return TokenResponse(
+        access_token=create_access_token(user.id),
+    )
+
+
+@router.get("/me", response_model=UserResponse)
+async def read_current_user(
+    current_user: User = Depends(get_current_user),
+):
+    return current_user

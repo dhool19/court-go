@@ -4,12 +4,18 @@ from sqlalchemy import select
 
 from db.database import get_db
 from models.court_model import Court
+from api.dependencies import require_admin
 from schemas.court_schema import CourtCreate, CourtResponse, CourtUpdate
 
 router = APIRouter(prefix="/courts", tags=["Courts"])
 
 
-@router.post("", response_model=CourtResponse, status_code=201)
+@router.post(
+    "",
+    response_model=CourtResponse,
+    status_code=201,
+    dependencies=[Depends(require_admin)],
+)
 async def create_court(
     data: CourtCreate,
     db: AsyncSession = Depends(get_db),
@@ -40,7 +46,7 @@ async def read_court(
     return db_item
 
 
-@router.delete("/{court_id}")
+@router.delete("/{court_id}", dependencies=[Depends(require_admin)])
 async def delete_court(
     court_id: int,
     db: AsyncSession = Depends(get_db),
@@ -54,7 +60,9 @@ async def delete_court(
     return {"message": "court deleted"}
 
 
-@router.patch("/{court_id}", response_model=CourtResponse)
+@router.patch(
+    "/{court_id}", response_model=CourtResponse, dependencies=[Depends(require_admin)]
+)
 async def update_court(
     court_id: int, court_u: CourtUpdate, db: AsyncSession = Depends(get_db)
 ):
