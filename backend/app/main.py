@@ -6,9 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from db.database import Base, engine
 from models.user_model import User
 from models.slot_model import CourtSlot
+from models.booking_model import Booking
+from models.reservation_model import SlotReservation
 from api.courts import router as courts_router
 from api.auth import router as users_router
 from api.slots import router as slots_router
+from api.bookings import router as bookings_router
 
 
 @asynccontextmanager
@@ -30,6 +33,7 @@ app.add_middleware(
 app.include_router(courts_router)
 app.include_router(users_router)
 app.include_router(slots_router)
+app.include_router(bookings_router)
 
 
 @app.get("/health")

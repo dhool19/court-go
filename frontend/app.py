@@ -321,5 +321,125 @@ if courts:
                 )
             st.caption("Times shown in Europe/Berlin.")
             st.dataframe(rows, hide_index=True)
+
+            if current_user is None:
+                st.info("Log in to book a slot.")
+            else:
+                future_slots = []
+
+                for slot in slots:
+                    starts_at = datetime.fromisoformat(
+                        slot["starts_at"].replace("Z", "+00:00")
+                    )
+
+                    if not slot["is_blocked"] and starts_at > datetime.now(
+                        centre_timezone
+                    ):
+                        future_slots.append(slot)
+
+                if future_slots:
+                    slot_labels = {}
+
+                    for slot in future_slots:
+                        starts_at = datetime.fromisoformat(
+                            slot["starts_at"].replace("Z", "+00:00")
+                        ).astimezone(centre_timezone)
+
+                        ends_at = datetime.fromisoformat(
+                            slot["ends_at"].replace("Z", "+00:00")
+                        ).astimezone(centre_timezone)
+
+                        slot_labels[slot["id"]] = f"{starts_at:%H:%M}-{ends_at:%H:%M}"
+
+                    with st.form("book_slot_form"):
+                        selected_slot_id = st.selectbox(
+                            "Choose a slot",
+                            options=list(slot_labels),
+                            format_func=lambda slot_id: slot_labels[slot_id],
+                        )
+
+                        book_clicked = st.form_submit_button("Book slot")
+
+                    if book_clicked:
+                        try:
+                            booking_response = requests.post(
+                                f"{API_URL}/bookings",
+                                json={"slot_id": selected_slot_id},
+                                headers=auth_headers,
+                                timeout=10,
+                            )
+                            booking_response.raise_for_status()
+                        except requests.HTTPError:
+                            st.error("Booking failed")
+                            st.write(booking_response.text)
+                        except requests.RequestException:
+                            st.error("Could not connect to backend")
+                        else:
+                            booking = booking_response.json()
+                            st.success(f"Booking #{booking['id']} confirmed.")
+
+                else:
+                    st.info("No futire, unblocked slots for this date.")
 else:
     st.info("Add a court to view its slots.")
+st.divider()
+
+# ==========================================
+# My Bookings Section
+# ==========================================
+if current_user is not None:
+    st.subheader("All bookings" if is_admin else "My bookings")
+
+    try:
+        booking_response = requests.get(
+            f"{API_URL}/bookings",
+            headers=auth_headers,
+            timeout=5,
+        )
+        booking_response.raise_for_status()
+    except requests.HTTPError:
+        st.error("Could not load bookings")
+        st.write(booking_response.text)
+    except requests.RequestException:
+        st.error("Could not connect to backend")
+    else:
+        bookings = booking_response.json()
+
+        if not bookings:
+            st.info("No bookings yet.")
+
+        for booking in bookings:
+            st.write(
+                f"**Booking #{booking['id']}** . "
+                f"Slot #{booking['slot_id']} . "
+                f"€{booking['booked_price']} . "
+                f"{booking['status']} . "
+            )
+
+            if booking["status"] == "confirmed":
+                confirm_cancel = st.checkbox(
+                    "Confirm cancellation",
+                    key=f"confirm_cancel_{booking['id']}",
+                )
+
+                cancel_clicked = st.button(
+                    "Cancel booking",
+                    key=f"cancel_booking_{booking['id']}",
+                    disabled=not confirm_cancel,
+                )
+
+                if cancel_clicked:
+                    try:
+                        cancel_response = requests.post(
+                            f"{API_URL}/bookings/{booking['id']}/cancel",
+                            headers=auth_headers,
+                            timeout=10,
+                        )
+                        cancel_response.raise_for_status()
+                    except requests.HTTPError:
+                        st.error("Cancellation failed")
+                        st.write(cancel_response.text)
+                    except requests.RequestException:
+                        st.error("Could not connect to backend")
+                    else:
+                        st.rerun()
