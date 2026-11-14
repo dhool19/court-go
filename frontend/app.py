@@ -1,6 +1,9 @@
 import requests
 import streamlit as st
 
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
 API_URL = "http://localhost:8000"
 
 if "access_token" not in st.session_state:
@@ -233,3 +236,90 @@ else:
                     delete_court_dialog(court)
 
 st.divider()
+st.subheader("View court slots")
+
+centre_timezone = ZoneInfo("Europe/Berlin")
+today = datetime.now(centre_timezone).date()
+
+if courts:
+    court_option = {court["id"]: court["name"] for court in courts}
+
+    selected_court_id = st.selectbox(
+        "Choose a court",
+        options=list(court_option),
+        format_func=lambda court_id: (f"{court_option[court_id]} (ID: {court_id})"),
+    )
+
+    selected_date = st.date_input(
+        "Choose a date",
+        value=today,
+        min_value=today,
+        max_value=today + timedelta(days=30),
+    )
+
+    if is_admin:
+        if st.button("Generate slots", type="primary"):
+            try:
+                generate_response = requests.post(
+                    f"{API_URL}/courts/{selected_court_id}/slots/generate",
+                    json={"date": selected_date.isoformat()},
+                    headers=auth_headers,
+                    timeout=10,
+                )
+
+                generate_response.raise_for_status()
+            except requests.HTTPError:
+                st.error(
+                    f"Could not generate slots"
+                    f"(HTTP {generate_response.status_code})."
+                )
+                st.write(generate_response.text)
+            except requests.RequestException:
+                st.error("Could not connect to backend")
+
+            else:
+                created_count = generate_response.json()["created_slots"]
+
+                if created_count:
+                    st.success(f"Created {created_count} slots.")
+                else:
+                    st.error("No new slots needed.")
+
+    try:
+        response = requests.get(
+            f"{API_URL}/courts/{selected_court_id}/slots",
+            params={"selected_date": selected_date.isoformat()},
+            timeout=5,
+        )
+        response.raise_for_status()
+    except requests.RequestException as error:
+        st.error(f"Could not load slots. {error}")
+    else:
+        slots = response.json()
+
+        if not slots:
+            st.info("No slots generated for this date")
+        else:
+            rows = []
+
+            for slot in slots:
+                starts_at = datetime.fromisoformat(
+                    slot["starts_at"].replace("Z", "+00:00")
+                ).astimezone(centre_timezone)
+
+                ends_at = datetime.fromisoformat(
+                    slot["ends_at"].replace("Z", "+00:00")
+                ).astimezone(centre_timezone)
+
+                rows.append(
+                    {
+                        "Slot ID": slot["id"],
+                        "Start": starts_at.strftime("%H:%M"),
+                        "End": ends_at.strftime("%H:%M"),
+                        "Maintenance": ("Blocked" if slot["is_blocked"] else "Open"),
+                    }
+                )
+            st.caption("Times shown in Europe/Berlin.")
+            st.dataframe(rows, hide_index=True)
+else:
+    st.info("Add a court to view its slots.")
