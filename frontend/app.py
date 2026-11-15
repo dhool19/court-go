@@ -192,6 +192,98 @@ def delete_court_dialog(court):
 
 
 # ==========================================
+# Rescheduling Section
+# ==========================================
+@st.dialog("Reschedule Booking")
+def reschedule_booking_dialog(booking):
+    st.write(f"Booking #{booking['id']}")
+
+    if not courts:
+        st.info("No courts available")
+        return
+
+    court_options = {court["id"]: court["name"] for court in courts}
+
+    new_court_id = st.selectbox(
+        "Choose a court",
+        options=list(court_options),
+        format_func=lambda court_id: (f"{court_options[court_id]} (ID: {court_id})"),
+        key="reschedule_court",
+    )
+
+    today = datetime.now(centre_timezone).date()
+
+    new_date = st.date_input(
+        "Choose a date",
+        value=today,
+        min_value=today,
+        max_value=today + timedelta(days=30),
+        key="reschedule_date",
+    )
+
+    try:
+        response = requests.get(
+            f"{API_URL}/courts/{new_court_id}/slots",
+            params={"selected_date": new_date.isoformat()},
+            timeout=5,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        st.error("Could not load slots.")
+        return
+
+    slot_labels = {}
+
+    for slot in response.json():
+        starts_at = datetime.fromisoformat(
+            slot["starts_at"].replace("Z", "+00:00")
+        ).astimezone(centre_timezone)
+
+        ends_at = datetime.fromisoformat(
+            slot["ends_at"].replace("Z", "+00:00")
+        ).astimezone(centre_timezone)
+
+        if (
+            not slot["is_blocked"]
+            and not slot["is_booked"]
+            and starts_at > datetime.now(centre_timezone)
+        ):
+            slot_labels[slot["id"]] = f"{starts_at:%H:%M}-{ends_at:%H:%M}"
+
+    if not slot_labels:
+        st.info("No available slots for this court and date.")
+        return
+
+    new_slot_id = st.selectbox(
+        "Choose a new slot",
+        options=list(slot_labels),
+        format_func=lambda slot_id: slot_labels[slot_id],
+        key=f"reschedule_slot_{new_court_id}_{new_date}",
+    )
+
+    court = next(court for court in courts if court["id"] == new_court_id)
+
+    st.write(f"New booking price: €{court['hourly_price']}")
+
+    if st.button("Confirm reschedule", type="primary"):
+        try:
+            response = requests.post(
+                f"{API_URL}/bookings/{booking['id']}/reschedule",
+                json={"slot_id": new_slot_id},
+                headers=auth_headers,
+                timeout=10,
+            )
+            response.raise_for_status()
+        except requests.HTTPError:
+            st.error("Could not reschedule the booking.")
+            st.write(response.text)
+        except requests.RequestException:
+            st.error("Could not connect to backend.")
+        else:
+            st.rerun()
+
+
+# ==========================================
 # 4. LIST COURTS WITH ACTION BUTTONS
 # ==========================================
 
@@ -438,7 +530,7 @@ if current_user is not None:
 
             st.write(
                 f"{starts_at:%d %b %Y} · "
-                f"{starts_at: %H:%M}-{ends_at: %H:%M} · "
+                f"{starts_at:%H:%M}-{ends_at:%H:%M} · "
                 f"€{booking['booked_price']} · "
                 f"{booking['status']}"
             )
@@ -446,6 +538,12 @@ if current_user is not None:
             if booking["status"] == "confirmed" and starts_at > datetime.now(
                 centre_timezone
             ):
+                if st.button(
+                    "Reschedule",
+                    key=f"reschedule_{booking['id']}",
+                ):
+                    reschedule_booking_dialog(booking)
+
                 confirm_cancel = st.checkbox(
                     "Confirm cancellation",
                     key=f"confirm_cancel_{booking['id']}",

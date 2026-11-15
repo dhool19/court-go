@@ -11,7 +11,12 @@ from models.reservation_model import SlotReservation
 from models.booking_model import Booking
 from api.dependencies import get_current_user
 from db.database import get_db
-from schemas.booking_schema import BookingCreate, BookingResponse, BookingListResponse
+from schemas.booking_schema import (
+    BookingCreate,
+    BookingResponse,
+    BookingListResponse,
+    BookingReschedule,
+)
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -173,6 +178,96 @@ async def cancel_booking(
 
     except Exception:
         await db.rollback()
+        raise
+
+    await db.refresh(booking)
+    return booking
+
+
+@router.post("/{booking_id}/reschedule", response_model=BookingResponse)
+async def reschedule_booking(
+    booking_id: int,
+    data: BookingReschedule,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(Booking).where(Booking.id == booking_id)
+
+    if current_user.role != "admin":
+        query = query.where(Booking.customer_id == current_user.id)
+    result = await db.execute(query.with_for_update())
+    booking = result.scalar_one_or_none()
+
+    if booking is None:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    if booking.status != "confirmed":
+        raise HTTPException(status_code=409, detail="Only confirmed can be rescheduled")
+
+    old_slot = await db.get(CourtSlot, booking.slot_id)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    if old_slot.starts_at <= now:
+        raise HTTPException(status_code=409, detail="Booking has already started")
+
+    if data.slot_id == booking.slot_id:
+        return booking
+
+    slot_result = await db.execute(
+        select(CourtSlot).where(CourtSlot.id == data.slot_id).with_for_update()
+    )
+    new_slot = slot_result.scalar_one_or_none()
+
+    if new_slot is None:
+        raise HTTPException(status_code=404, detail="New slot not found")
+
+    if new_slot.is_blocked:
+        raise HTTPException(status_code=409, detail="New slot is blocked")
+
+    if new_slot.starts_at <= now:
+        raise HTTPException(status_code=409, detail="New slot has already started")
+
+    if new_slot.starts_at > now + timedelta(days=30):
+        raise HTTPException(
+            status_code=422, detail="New slot is outside the booking window"
+        )
+
+    court_result = await db.execute(
+        select(Court).where(Court.id == new_slot.court_id).with_for_update()
+    )
+    court = court_result.scalar_one()
+
+    if not court.is_active:
+        raise HTTPException(status_code=409, detail="Court is inactive")
+
+    reservation_result = await db.execute(
+        select(SlotReservation)
+        .where(SlotReservation.booking_id == booking.id)
+        .with_for_update()
+    )
+
+    reservation = reservation_result.scalar_one_or_none()
+
+    if reservation is None:
+        raise HTTPException(status_code=409, detail="Booking has no active reservation")
+
+    try:
+        booking.slot_id = new_slot.id
+        booking.booked_price = court.hourly_price
+
+        reservation.slot_id = new_slot.id
+        reservation.starts_at = new_slot.starts_at
+
+        await db.commit()
+
+    except IntegrityError as e:
+        await db.rollback()
+
+        if e.orig.args[0] == 1062:
+            raise HTTPException(
+                status_code=409,
+                detail="The slot is booked or this customer already has a booking at that time",
+            )
         raise
 
     await db.refresh(booking)

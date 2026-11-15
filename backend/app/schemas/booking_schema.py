@@ -8,6 +8,10 @@ class BookingCreate(BaseModel):
     slot_id: int = Field(gt=0)
 
 
+class BookingReschedule(BaseModel):
+    slot_id: int = Field(gt=0)
+
+
 class BookingResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
