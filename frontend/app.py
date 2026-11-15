@@ -325,7 +325,7 @@ if courts:
                         "Slot ID": slot["id"],
                         "Start": starts_at.strftime("%H:%M"),
                         "End": ends_at.strftime("%H:%M"),
-                        "Maintenance": status,
+                        "Status": status,
                     }
                 )
             st.caption("Times shown in Europe/Berlin.")
@@ -420,14 +420,26 @@ if current_user is not None:
             st.info("No bookings yet.")
 
         for booking in bookings:
+            starts_at = datetime.fromisoformat(
+                booking["starts_at"].replace("Z", "+00:00")
+            ).astimezone(centre_timezone)
+
+            ends_at = datetime.fromisoformat(
+                booking["ends_at"].replace("Z", "+00:00")
+            ).astimezone(centre_timezone)
+
+            st.write(f"**Booking #{booking['id']} . " f"{booking['court_name']}**")
+
             st.write(
-                f"**Booking #{booking['id']}** . "
-                f"Slot #{booking['slot_id']} . "
+                f"{starts_at:%d %b %Y} . "
+                f"{starts_at: %H:%M}-{ends_at: %H:%M} . "
                 f"€{booking['booked_price']} . "
                 f"{booking['status']} . "
             )
 
-            if booking["status"] == "confirmed":
+            if booking["status"] == "confirmed" and starts_at > datetime.now(
+                centre_timezone
+            ):
                 confirm_cancel = st.checkbox(
                     "Confirm cancellation",
                     key=f"confirm_cancel_{booking['id']}",

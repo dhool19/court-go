@@ -11,17 +11,26 @@ from models.reservation_model import SlotReservation
 from models.booking_model import Booking
 from api.dependencies import get_current_user
 from db.database import get_db
-from schemas.booking_schema import BookingCreate, BookingResponse
+from schemas.booking_schema import BookingCreate, BookingResponse, BookingListResponse
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
 
-@router.get("", response_model=list[BookingResponse])
+@router.get("", response_model=list[BookingListResponse])
 async def list_bookings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    query = select(Booking)
+    query = (
+        select(
+            Booking,
+            Court.name,
+            CourtSlot.starts_at,
+            CourtSlot.ends_at,
+        )
+        .join(CourtSlot, CourtSlot.id == Booking.slot_id)
+        .join(Court, Court.id == CourtSlot.court_id)
+    )
 
     if current_user.role != "admin":
         query = query.where(Booking.customer_id == current_user.id)
@@ -29,7 +38,19 @@ async def list_bookings(
     query = query.order_by(Booking.id.desc())
 
     result = await db.execute(query)
-    return result.scalars().all()
+    return [
+        BookingListResponse(
+            id=booking.id,
+            customer_id=booking.customer_id,
+            slot_id=booking.slot_id,
+            booked_price=booking.booked_price,
+            status=booking.status,
+            court_name=court_name,
+            starts_at=starts_at.replace(tzinfo=timezone.utc),
+            ends_at=ends_at.replace(tzinfo=timezone.utc),
+        )
+        for booking, court_name, starts_at, ends_at in result.all()
+    ]
 
 
 @router.post("", response_model=BookingResponse, status_code=201)

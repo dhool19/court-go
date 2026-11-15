@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 
 
@@ -15,3 +16,9 @@ class BookingResponse(BaseModel):
     slot_id: int
     booked_price: Decimal
     status: str
+
+
+class BookingListResponse(BookingResponse):
+    court_name: str
+    starts_at: datetime
+    ends_at: datetime
