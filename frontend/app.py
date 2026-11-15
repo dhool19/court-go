@@ -7,7 +7,10 @@ from zoneinfo import ZoneInfo
 API_URL = "http://localhost:8000"
 
 if "access_token" not in st.session_state:
-    st.session_state.access_token = None
+    if "token" in st.query_params:
+        st.session_state.access_token = st.query_params["token"]
+    else:
+        st.session_state.access_token = None
 
 st.title("CourtGo")
 
@@ -34,7 +37,9 @@ if st.session_state.access_token is None:
         except requests.RequestException:
             st.sidebar.error("Could not connect to backend")
         else:
-            st.session_state.access_token = response.json()["access_token"]
+            token = response.json()["access_token"]
+            st.session_state.access_token = token
+            st.query_params["token"] = token
             st.rerun()
 
 current_user = None
@@ -60,6 +65,7 @@ if st.session_state.access_token:
 
     if st.sidebar.button("Logout"):
         st.session_state.access_token = None
+        st.query_params.clear()
         st.rerun()
 
 is_admin = current_user is not None and current_user["role"] == "admin"
@@ -428,13 +434,13 @@ if current_user is not None:
                 booking["ends_at"].replace("Z", "+00:00")
             ).astimezone(centre_timezone)
 
-            st.write(f"**Booking #{booking['id']} . " f"{booking['court_name']}**")
+            st.write(f"**Booking #{booking['id']} · " f"{booking['court_name']}**")
 
             st.write(
-                f"{starts_at:%d %b %Y} . "
-                f"{starts_at: %H:%M}-{ends_at: %H:%M} . "
-                f"€{booking['booked_price']} . "
-                f"{booking['status']} . "
+                f"{starts_at:%d %b %Y} · "
+                f"{starts_at: %H:%M}-{ends_at: %H:%M} · "
+                f"€{booking['booked_price']} · "
+                f"{booking['status']}"
             )
 
             if booking["status"] == "confirmed" and starts_at > datetime.now(
