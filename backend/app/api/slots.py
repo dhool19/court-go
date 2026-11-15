@@ -8,6 +8,7 @@ from sqlalchemy import select
 from api.dependencies import require_admin
 from models.slot_model import CourtSlot
 from models.court_model import Court
+from models.reservation_model import SlotReservation
 from db.database import get_db
 from schemas.court_slot_schema import SlotGenerate, SlotResponse
 
@@ -107,7 +108,11 @@ async def lists_slot(
     utc_end = local_end.astimezone(timezone.utc).replace(tzinfo=None)
 
     query = (
-        select(CourtSlot)
+        select(CourtSlot, SlotReservation.slot_id)
+        .outerjoin(
+            SlotReservation,
+            SlotReservation.slot_id == CourtSlot.id,
+        )
         .where(
             CourtSlot.court_id == court_id,
             CourtSlot.starts_at >= utc_start,
@@ -117,7 +122,6 @@ async def lists_slot(
     )
 
     result = await db.execute(query)
-    slots = result.scalars().all()
 
     return [
         SlotResponse(
@@ -126,6 +130,7 @@ async def lists_slot(
             starts_at=slot.starts_at.replace(tzinfo=timezone.utc),
             ends_at=slot.ends_at.replace(tzinfo=timezone.utc),
             is_blocked=slot.is_blocked,
+            is_booked=reserved_slot_id is not None,
         )
-        for slot in slots
+        for slot, reserved_slot_id in result.all()
     ]

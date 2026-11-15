@@ -311,12 +311,21 @@ if courts:
                     slot["ends_at"].replace("Z", "+00:00")
                 ).astimezone(centre_timezone)
 
+                if slot["is_blocked"]:
+                    status = "Maintenance"
+                elif slot["is_booked"]:
+                    status = "Booked"
+                elif starts_at <= datetime.now(centre_timezone):
+                    status = "Past"
+                else:
+                    status = "Available"
+
                 rows.append(
                     {
                         "Slot ID": slot["id"],
                         "Start": starts_at.strftime("%H:%M"),
                         "End": ends_at.strftime("%H:%M"),
-                        "Maintenance": ("Blocked" if slot["is_blocked"] else "Open"),
+                        "Maintenance": status,
                     }
                 )
             st.caption("Times shown in Europe/Berlin.")
@@ -332,8 +341,10 @@ if courts:
                         slot["starts_at"].replace("Z", "+00:00")
                     )
 
-                    if not slot["is_blocked"] and starts_at > datetime.now(
-                        centre_timezone
+                    if (
+                        not slot["is_blocked"]
+                        and not slot["is_booked"]
+                        and starts_at > datetime.now(centre_timezone)
                     ):
                         future_slots.append(slot)
 
@@ -379,7 +390,7 @@ if courts:
                             st.success(f"Booking #{booking['id']} confirmed.")
 
                 else:
-                    st.info("No futire, unblocked slots for this date.")
+                    st.info("No available future slots for this date.")
 else:
     st.info("Add a court to view its slots.")
 st.divider()

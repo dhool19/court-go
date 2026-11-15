@@ -15,3 +15,4 @@ class SlotResponse(BaseModel):
     starts_at: datetime
     ends_at: datetime
     is_blocked: bool
+    is_booked: bool
