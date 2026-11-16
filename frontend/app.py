@@ -15,9 +15,62 @@ if "access_token" not in st.session_state:
 st.title("CourtGo")
 
 # ==========================================
-# Login User
+# Register / Login User
 # ==========================================
 if st.session_state.access_token is None:
+    # ===================
+    # Register
+    # ===================
+    with st.sidebar.expander("Create an account"):
+        with st.form("register_form"):
+            first_name = st.text_input("First name", max_chars=100)
+            last_name = st.text_input("Last name", max_chars=100)
+            register_email = st.text_input("Email", key="register_email")
+            register_password = st.text_input(
+                "Password",
+                type="password",
+                key="register_password",
+            )
+            confirm_password = st.text_input("Confirm password", type="password")
+
+            register_clicked = st.form_submit_button("Register")
+
+        if register_clicked:
+            if not first_name.strip() or not last_name.strip():
+                st.error("Enter your first and last name.")
+            elif len(register_password) < 8:
+                st.error("Password must contain atleast 8 characters.")
+            elif register_password != confirm_password:
+                st.error("Password do not match.")
+            else:
+                payload = {
+                    "first_name": first_name.strip(),
+                    "last_name": last_name.strip(),
+                    "email": register_email.strip(),
+                    "password": register_password,
+                }
+
+                try:
+                    register_response = requests.post(
+                        f"{API_URL}/auth/register",
+                        json=payload,
+                        timeout=10,
+                    )
+                    register_response.raise_for_status()
+                except requests.HTTPError:
+                    if register_response.status_code == 409:
+                        st.error("This email is already registered.")
+                    else:
+                        st.error("Registration failed")
+                        st.write(register_response.text)
+                except requests.RequestException:
+                    st.error("Could not connect to backend")
+                else:
+                    st.success("Account created. You can now log in.")
+                    
+    # ===================
+    # Login
+    # ===================
     with st.sidebar.form("login_form"):
         st.subheader("Login")
         email = st.text_input("Email")
