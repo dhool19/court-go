@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CourtCreate(BaseModel):
@@ -18,6 +18,14 @@ class CourtUpdate(BaseModel):
         default=None, gt=0, max_digits=8, decimal_places=2
     )
     description: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @field_validator("name", "sport_type", "hourly_price")
+    @classmethod
+    def reject_null(cls, value):
+        if value is None:
+            raise ValueError("This field cannot be null")
+
+        return value
 
 
 class CourtResponse(CourtCreate):
