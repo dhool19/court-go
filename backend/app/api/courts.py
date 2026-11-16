@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 
 from db.database import get_db
@@ -51,13 +52,24 @@ async def delete_court(
     court_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(select(Court).where(Court.id == court_id))
-    db_item = result.scalar_one_or_none()
-    if db_item is None:
+    court = await db.get(Court, court_id)
+
+    if court is None:
         raise HTTPException(status_code=404, detail="Court not found")
-    await db.delete(db_item)
-    await db.commit()
-    return {"message": "court deleted"}
+
+    try:
+        await db.delete(court)
+        await db.commit()
+    except IntegrityError as e:
+        await db.rollback()
+
+        if e.orig.args[0] == 1451:
+            raise HTTPException(
+                status_code=409,
+                detail="This court has slots and cannot be deleted",
+            ) from e
+        raise
+    return {"message": "Court deleted"}
 
 
 @router.patch(

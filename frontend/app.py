@@ -67,7 +67,7 @@ if st.session_state.access_token is None:
                     st.error("Could not connect to backend")
                 else:
                     st.success("Account created. You can now log in.")
-                    
+
     # ===================
     # Login
     # ===================
@@ -238,8 +238,13 @@ def delete_court_dialog(court):
                 f"{API_URL}/courts/{court['id']}", headers=auth_headers, timeout=5
             )
             response.raise_for_status()
+        except requests.HTTPError:
+            if response.status_code == 409:
+                st.error(response.json()["detail"])
+            else:
+                st.error(f"Could not delete court ({response.status_code}).")
         except requests.RequestException as e:
-            st.error(f"Failed to delete: {e}")
+            st.error(f"Could not connect to backend. Failed to delete: {e}")
         else:
             st.rerun()
 
