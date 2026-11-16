@@ -615,7 +615,11 @@ if current_user is not None:
                 booking["ends_at"].replace("Z", "+00:00")
             ).astimezone(centre_timezone)
 
-            st.write(f"**Booking #{booking['id']} · " f"{booking['court_name']}**")
+            st.write(
+                f"**Booking #{booking['id']} · "
+                f"{booking['court_name']} · "
+                f"{booking['sport_type'].title()}**"
+            )
 
             st.write(
                 f"{starts_at:%d %b %Y} · "

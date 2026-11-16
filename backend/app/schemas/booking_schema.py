@@ -24,5 +24,6 @@ class BookingResponse(BaseModel):
 
 class BookingListResponse(BookingResponse):
     court_name: str
+    sport_type: str
     starts_at: datetime
     ends_at: datetime

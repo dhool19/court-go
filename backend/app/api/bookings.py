@@ -30,6 +30,7 @@ async def list_bookings(
         select(
             Booking,
             Court.name,
+            Court.sport_type,
             CourtSlot.starts_at,
             CourtSlot.ends_at,
         )
@@ -51,10 +52,11 @@ async def list_bookings(
             booked_price=booking.booked_price,
             status=booking.status,
             court_name=court_name,
+            sport_type=sport_type,
             starts_at=starts_at.replace(tzinfo=timezone.utc),
             ends_at=ends_at.replace(tzinfo=timezone.utc),
         )
-        for booking, court_name, starts_at, ends_at in result.all()
+        for booking, court_name, sport_type, starts_at, ends_at in result.all()
     ]
 
 
