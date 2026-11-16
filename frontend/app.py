@@ -17,6 +17,9 @@ st.title("CourtGo")
 if "success_message" in st.session_state:
     st.success(st.session_state.pop("success_message"))
 
+if "login_message" in st.session_state:
+    st.warning(st.session_state.pop("login_message"))
+
 # ==========================================
 # Register / Login User
 # ==========================================
@@ -101,11 +104,27 @@ if st.session_state.access_token is None:
 current_user = None
 auth_headers = {}
 
+
+# ==========================================
+# Expired tokens
+# ==========================================
+def check_session(response):
+    if response.status_code == 401:
+        st.session_state.access_token = None
+        st.session_state.login_message = (
+            "Your session has expired or is invalid. Please log in again."
+        )
+        st.rerun()
+
+
+# ==========================================
+
 if st.session_state.access_token:
     auth_headers = {"Authorization": f"Bearer {st.session_state.access_token}"}
 
     try:
         response = requests.get(f"{API_URL}/auth/me", headers=auth_headers, timeout=5)
+        check_session(response)
         response.raise_for_status()
     except requests.HTTPError:
         if response.status_code in (401, 403):
@@ -156,6 +175,7 @@ def add_court_dialog():
                 response = requests.post(
                     f"{API_URL}/courts", json=payload, headers=auth_headers, timeout=5
                 )
+                check_session(response)
                 response.raise_for_status()
             except requests.RequestException as error:
                 st.error(f"Could not save the court. {error}")
@@ -220,6 +240,7 @@ def edit_court_dialog(court):
                         headers=auth_headers,
                         timeout=5,
                     )
+                    check_session(response)
                     response.raise_for_status()
                 except requests.RequestException as e:
                     st.error(f"Could not updated court: {e}")
@@ -240,6 +261,7 @@ def delete_court_dialog(court):
             response = requests.delete(
                 f"{API_URL}/courts/{court['id']}", headers=auth_headers, timeout=5
             )
+            check_session(response)
             response.raise_for_status()
         except requests.HTTPError:
             if response.status_code == 409:
@@ -334,6 +356,7 @@ def reschedule_booking_dialog(booking):
                 headers=auth_headers,
                 timeout=10,
             )
+            check_session(response)
             response.raise_for_status()
         except requests.HTTPError:
             st.error("Could not reschedule the booking.")
@@ -425,7 +448,7 @@ if courts:
                     headers=auth_headers,
                     timeout=10,
                 )
-
+                check_session(generate_response)
                 generate_response.raise_for_status()
             except requests.HTTPError:
                 st.error(
@@ -538,6 +561,7 @@ if courts:
                                 headers=auth_headers,
                                 timeout=10,
                             )
+                            check_session(booking_response)
                             booking_response.raise_for_status()
                         except requests.HTTPError:
                             st.error("Booking failed")
@@ -569,6 +593,7 @@ if current_user is not None:
             headers=auth_headers,
             timeout=5,
         )
+        check_session(booking_response)
         booking_response.raise_for_status()
     except requests.HTTPError:
         st.error("Could not load bookings")
@@ -626,6 +651,7 @@ if current_user is not None:
                             headers=auth_headers,
                             timeout=10,
                         )
+                        check_session(cancel_response)
                         cancel_response.raise_for_status()
                     except requests.HTTPError:
                         st.error("Cancellation failed")
