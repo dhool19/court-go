@@ -16,3 +16,7 @@ class SlotResponse(BaseModel):
     ends_at: datetime
     is_blocked: bool
     is_booked: bool
+
+
+class SlotUpdate(BaseModel):
+    is_blocked: bool

@@ -10,7 +10,7 @@ from models.slot_model import CourtSlot
 from models.court_model import Court
 from models.reservation_model import SlotReservation
 from db.database import get_db
-from schemas.court_slot_schema import SlotGenerate, SlotResponse
+from schemas.court_slot_schema import SlotGenerate, SlotResponse, SlotUpdate
 
 router = APIRouter(prefix="/courts", tags=["Slots"])
 
@@ -134,3 +134,49 @@ async def lists_slot(
         )
         for slot, reserved_slot_id in result.all()
     ]
+
+
+@router.patch(
+    "/{court_id}/slots/{slot_id}",
+    dependencies=[Depends(require_admin)],
+)
+async def update_slot(
+    court_id: int,
+    slot_id: int,
+    data: SlotUpdate,
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(CourtSlot)
+        .where(
+            CourtSlot.id == slot_id,
+            CourtSlot.court_id == court_id,
+        )
+        .with_for_update()
+    )
+
+    slot = result.scalar_one_or_none()
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Slot not found")
+
+    if data.is_blocked:
+        reservation_result = await db.execute(
+            select(SlotReservation)
+            .where(SlotReservation.slot_id == slot.id)
+            .with_for_update()
+        )
+        reservation = reservation_result.scalar_one_or_none()
+
+        if reservation is not None:
+            raise HTTPException(
+                status_code=409,
+                detail="Cancel the booking before blocking this slot",
+            )
+
+    slot.is_blocked = data.is_blocked
+    await db.commit()
+
+    return {
+        "slot_id": slot.id,
+        "is_blocked": slot.is_blocked,
+    }
