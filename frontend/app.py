@@ -14,6 +14,9 @@ if "access_token" not in st.session_state:
 
 st.title("CourtGo")
 
+if "success_message" in st.session_state:
+    st.success(st.session_state.pop("success_message"))
+
 # ==========================================
 # Register / Login User
 # ==========================================
@@ -543,7 +546,10 @@ if courts:
                             st.error("Could not connect to backend")
                         else:
                             booking = booking_response.json()
-                            st.success(f"Booking #{booking['id']} confirmed.")
+                            st.session_state.success_message = (
+                                f"Booking #{booking['id']} confirmed."
+                            )
+                            st.rerun()
 
                 else:
                     st.info("No available future slots for this date.")
