@@ -29,11 +29,14 @@ async def list_bookings(
     query = (
         select(
             Booking,
+            User.first_name,
+            User.last_name,
             Court.name,
             Court.sport_type,
             CourtSlot.starts_at,
             CourtSlot.ends_at,
         )
+        .join(User, User.id == Booking.customer_id)
         .join(CourtSlot, CourtSlot.id == Booking.slot_id)
         .join(Court, Court.id == CourtSlot.court_id)
     )
@@ -44,20 +47,37 @@ async def list_bookings(
     query = query.order_by(Booking.id.desc())
 
     result = await db.execute(query)
-    return [
-        BookingListResponse(
-            id=booking.id,
-            customer_id=booking.customer_id,
-            slot_id=booking.slot_id,
-            booked_price=booking.booked_price,
-            status=booking.status,
-            court_name=court_name,
-            sport_type=sport_type,
-            starts_at=starts_at.replace(tzinfo=timezone.utc),
-            ends_at=ends_at.replace(tzinfo=timezone.utc),
+
+    bookings = []
+
+    for (
+        booking,
+        first_name,
+        last_name,
+        court_name,
+        sport_type,
+        starts_at,
+        ends_at,
+    ) in result.all():
+        customer_name = " ".join(
+            name.strip() for name in (first_name, last_name) if name and name.strip()
         )
-        for booking, court_name, sport_type, starts_at, ends_at in result.all()
-    ]
+
+        bookings.append(
+            BookingListResponse(
+                id=booking.id,
+                customer_id=booking.customer_id,
+                slot_id=booking.slot_id,
+                booked_price=booking.booked_price,
+                status=booking.status,
+                customer_name=customer_name or "Unknown customer",
+                court_name=court_name,
+                sport_type=sport_type,
+                starts_at=starts_at.replace(tzinfo=timezone.utc),
+                ends_at=ends_at.replace(tzinfo=timezone.utc),
+            )
+        )
+    return bookings
 
 
 @router.post("", response_model=BookingResponse, status_code=201)

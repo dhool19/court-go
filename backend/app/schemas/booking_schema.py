@@ -23,6 +23,7 @@ class BookingResponse(BaseModel):
 
 
 class BookingListResponse(BookingResponse):
+    customer_name: str
     court_name: str
     sport_type: str
     starts_at: datetime
