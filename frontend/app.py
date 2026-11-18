@@ -91,7 +91,7 @@ with st.sidebar:
     st.caption("Make time for your game.")
 
     if current_user:
-        st.write(f"Hello, {current_user.get('first_name', 'Player')}")
+        st.write(f"Hello, {(current_user.get('first_name', 'Player')).title()}")
 
         st.caption(f"Role: {current_user.get('role', 'user').title()}")
 

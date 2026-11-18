@@ -95,6 +95,33 @@ def render():
 
     court = courts_by_id[selected_court_id]
 
+    current_user = st.session_state.get("current_user")
+
+    if current_user and current_user.get("role") == "admin":
+        if st.button(
+            "Generate slots",
+            key="generate_court_slots",
+            type="primary",
+        ):
+            try:
+                result = api_request(
+                    "POST",
+                    f"/courts/{selected_court_id}/slots/generate",
+                    protected=True,
+                    json={
+                        "date": selected_date.isoformat(),
+                    },
+                )
+            except APIError as e:
+                st.error(str(e))
+            else:
+                created_count = result["created_slots"]
+
+                if created_count:
+                    st.success(f"Created {created_count} slots.")
+                else:
+                    st.info(f"Slots already exist for this date.")
+
     with st.container(border=True):
         st.subheader(court["name"])
 

@@ -104,7 +104,7 @@ def render():
             if is_admin:
                 st.write(
                     f"**Booked by:** "
-                    f"{booking.get('customer_name') or 'Name unavailable'}"
+                    f"{(booking.get('customer_name') or 'Name unavailable').title()}"
                 )
 
             st.write(f"**Sport:** " f"{booking.get('sport_type', 'Unknown').title()}")
